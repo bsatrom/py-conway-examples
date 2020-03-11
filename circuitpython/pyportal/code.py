@@ -8,7 +8,7 @@ from time import sleep
 from adafruit_display_text import label
 import neopixel
 
-from py_conway.game import Game
+from py_conway.game import Game, GameState
 
 """Game Variables"""
 # Large board
@@ -57,6 +57,8 @@ splash = displayio.Group()
 board_group = displayio.Group()
 
 """Game Functions"""
+
+
 def perform_startup():
     # Make the display context
     display.show(splash)
@@ -98,11 +100,12 @@ def perform_startup():
     text_group.append(text_area)  # Subgroup for text scaling
     splash.append(text_group)
 
-def game_over(num_generations):
+
+def game_over(num_generations, screen_text="Game Over!", screen_x=47):
     game_over_group = displayio.Group()
     
-    over_text_group = displayio.Group(max_size=10, scale=4, x=47, y=100)
-    over_text = "Game Over!"
+    over_text_group = displayio.Group(max_size=10, scale=4, x=screen_x, y=100)
+    over_text = screen_text = screen_text
     text_area = label.Label(terminalio.FONT, text=over_text, color=0xFF00FF)
     over_text_group.append(text_area)
     game_over_group.append(over_text_group)
@@ -119,6 +122,7 @@ def game_over(num_generations):
     
     display.show(game_over_group)
 
+
 def update_board():
     board_state = cpy_game.current_board
     for row in range(len(board_state)):
@@ -126,6 +130,18 @@ def update_board():
             cell_val = LIVE_PIXEL if board_state[row][col] == 1 \
                                   else DEFAULT_PIXEL
             game_board[row, col] = cell_val
+
+
+def start_game():
+    pixels.fill(0x000000)
+    pixels.show()
+
+    display.show(board_group)
+
+    cpy_game.reseed()
+    cpy_game.start()
+
+    update_board()
 
 """Game Logic"""
 perform_startup()
@@ -151,18 +167,10 @@ board_group.append(game_board)
 while True:
     if not is_game_running:
         if touchscreen.touch_point:
-            pixels.fill(0x000000)
-            pixels.show()
-            
-            display.show(board_group)
-            
             is_game_running = True
             is_game_over = False
-            
-            cpy_game.reseed()
-            cpy_game.start()
-            
-            update_board()
+
+            start_game()
     elif not is_game_over:
         # Add logic here to cancel or stop game
         if touchscreen.touch_point:
@@ -175,9 +183,17 @@ while True:
         # Run the next generation
         if cpy_game.live_cells > 0:
             cpy_game.run_generation()
-            
-            update_board()
-            # sleep(.25)  # Remove to run the game loop faster
+
+            if cpy_game.state == GameState.STASIS:
+                game_over(cpy_game.generations, screen_text="Stasis!", screen_x=80)
+                sleep(4)
+
+                is_game_running = True
+                is_game_over = False
+
+                start_game()
+            else:
+                update_board()
         else:
             is_game_running = False
             cpy_game.stop()
